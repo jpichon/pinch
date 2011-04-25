@@ -2,7 +2,8 @@ import gtk
 import hildon
 from pango import WRAP_WORD_CHAR
 
-from models import Dent
+from models import Dent, DentLoader
+import settings
 
 class DentBox():
 
@@ -34,7 +35,7 @@ class DentBox():
         msg_label.set_alignment(0, 0)
 
         time_label = gtk.Label()
-        time_label.set_markup("<i>%s</i>" % self.dent.tstamp)
+        time_label.set_markup("<i>%s</i>" % self.dent.tstamp_datetime())
         time_label.set_alignment(0, 0)
 
         action_button = self.create_mark_as_read_button()
@@ -54,11 +55,14 @@ class DentBox():
         return content_box
 
     def wrap_author_name(self):
+        max_length = 20
         author = self.dent.author
-        massaged = ''
-        for i in range(0, len(author), 10):
-            massaged += author[i:i+20] + "\n"
-        return massaged
+        wrapped = ''
+        for i in range(0, max_length, 10):
+            wrapped += author[i:i+10] + "\n"
+        if len(wrapped) > 20:
+            wrapped = wrapped[:19] + '...'
+        return wrapped
 
     def create_name_box(self):
         avatar = gtk.Image()
@@ -70,7 +74,7 @@ class DentBox():
         self.size_group.add_widget(name_label)
 
         label_box = gtk.HBox(False, 0)
-        label_box.pack_start(name_label, False, False, 0)
+        label_box.pack_start(name_label, False, False, 10)
 
         name_box = gtk.VBox(False, 0)
         name_box.pack_start(avatar, False, False, 0)
@@ -92,9 +96,8 @@ class TimelineView():
 
     size_group = gtk.SizeGroup(gtk.SIZE_GROUP_HORIZONTAL)
 
-    def __init__(self, dents):
-        self.dents = dents
-
+    def __init__(self):
+        self.dents = self.fetch_dents()
         self.box = self.create_timeline()
 
     def create_timeline(self):
@@ -106,18 +109,19 @@ class TimelineView():
 
         return vbox
 
+    def fetch_dents(self):
+        loader = DentLoader()
+        return loader.dents
+
 def main():
-    gtk.set_application_name("ClickClick")
+    gtk.set_application_name(settings.app_name)
     program = hildon.Program.get_instance()
 
     win = hildon.StackableWindow()
-    win.set_title("ClickClick")
+    win.set_title(settings.app_name)
     win.connect("destroy", gtk.main_quit, None)
 
-    from models import create_fake_dents
-    dents = create_fake_dents()
-
-    timeline = TimelineView(dents)
+    timeline = TimelineView()
 
     pannable_area = hildon.PannableArea()
     pannable_area.add_with_viewport(timeline.box)
