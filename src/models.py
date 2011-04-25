@@ -1,4 +1,5 @@
 from datetime import datetime
+import logging
 import os
 import sqlite3
 
@@ -26,6 +27,7 @@ class DentLoader():
     def __init__(self):
         self.dents = []
         self.db_path = os.path.expanduser(settings.db_path)
+        self.logger = logging.getLogger('DentLoader')
 
         self.load_dents()
 
@@ -39,6 +41,7 @@ class DentLoader():
 
         for row in c:
             d = Dent(id=row[0], author=row[1], message=row[2], tstamp=row[3])
+            self.logger.debug('Dent fetched from db: ' + str(d))
             self.dents.append(d)
 
         c.close()
@@ -46,9 +49,11 @@ class DentLoader():
 
     def _create_db(self):
         if not os.path.exists(os.path.expanduser(settings.data_path)):
+            self.logger.info('Creating app path')
             os.system('mkdir -p ' + os.path.expanduser(settings.data_path))
 
         if not os.path.exists(self.db_path):
+            self.logger.info('Create app database')
             conn = sqlite3.connect(self.db_path)
             c = conn.cursor()
             c.execute("""create table dents
@@ -61,6 +66,7 @@ class DentLoader():
             self.create_fake_dents()
 
     def create_fake_dents(self):
+        self.logger.debug("Creating fake dents")
         dents = []
 
         dents.append(Dent(1, "bob", "I like cheese!", "2011-04-25T14:00:14+00:00"))

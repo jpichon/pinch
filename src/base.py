@@ -1,3 +1,6 @@
+import logging
+import os
+
 import gtk
 import hildon
 from pango import WRAP_WORD_CHAR
@@ -114,6 +117,13 @@ class TimelineView():
         return loader.dents
 
 def main():
+    if not os.path.exists(os.path.expanduser(settings.data_path)):
+            os.system('mkdir -p ' + os.path.expanduser(settings.data_path))
+
+    logging.basicConfig(filename=os.path.expanduser(settings.log_file),
+                        filemode='w',
+                        level=logging.getLevelName(settings.log_level))
+
     gtk.set_application_name(settings.app_name)
     program = hildon.Program.get_instance()
 
