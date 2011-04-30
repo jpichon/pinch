@@ -99,17 +99,24 @@ class NoticeBox():
 class TimelineView():
 
     size_group = gtk.SizeGroup(gtk.SIZE_GROUP_HORIZONTAL)
+    first_unread = None
 
     def __init__(self):
         self.notices = self.fetch_notices()
         self.box = self.create_timeline()
+        if self.first_unread is None:
+            self.first_unread = self.box
 
     def create_timeline(self):
         vbox = gtk.VBox(False, 0)
 
+        found = False
         for notice in self.notices:
-            notice = NoticeBox(notice, self.size_group)
-            vbox.pack_start(notice.box, False, False, 0)
+            notice_box = NoticeBox(notice, self.size_group)
+            vbox.pack_start(notice_box.box, False, False, 0)
+            if not found and notice.read == False:
+                self.first_unread = notice_box.box
+                found = True
 
         return vbox
 
@@ -156,8 +163,8 @@ class Setup():
         self.logger.debug("Creating fake notices")
         notices = []
 
-        notices.append(Notice(1, "bob", "I like cheese!", "2011-04-25T14:00:14+00:00"))
-        notices.append(Notice(2, "alice", "Cool atmo at #RandomConference", "2011-04-25T13:54:00+00:00"))
+        notices.append(Notice(1, "bob", "I like cheese!", "2011-04-25T14:00:14+00:00", None, False, True))
+        notices.append(Notice(2, "alice", "Cool atmo at #RandomConference", "2011-04-25T13:54:00+00:00", None, False, True))
         notices.append(Notice(3, "someonewitharidiculouslylongnameabcdefghijklmnopqrstuvwxyz", "lol", "2011-04-25T13:40:40+00:00"))
         notices.append(Notice(4, "Lort43", "An effort at writing a message that is one hundred and forty characters long, a message that is one hundred and forty characters long. Yes!", "2011-04-25T13:12:04+00:00"))
 
@@ -165,12 +172,35 @@ class Setup():
 
         for notice in notices:
             conn.execute("insert into notices values (?, ?, ?, ?, ?, ?, ?)",
-                      (notice.id, notice.author, notice.message, notice.tstamp, '', 0, 0))
+                      (notice.id, notice.author, notice.message, notice.tstamp, '', 0, notice.read))
 
         conn.commit()
         conn.close()
 
         return notices
+
+def remove_read_dents(widget):
+    hildon.hildon_banner_show_information(widget, '', "Removing read dents")
+
+def jump_to_unread(widget, pannable_area, timeline):
+    pannable_area.scroll_to_child(timeline.first_unread)
+
+def create_menu(pannable_area, timeline):
+    menu = hildon.AppMenu()
+
+    rm_read_button = gtk.Button('Remove read')
+    rm_read_button.connect("clicked", remove_read_dents)
+    jump_unread_button = gtk.Button('Jump to unread')
+    jump_unread_button.connect("clicked",
+                               jump_to_unread,
+                               pannable_area,
+                               timeline)
+
+    menu.append(rm_read_button)
+    menu.append(jump_unread_button)
+    menu.show_all()
+
+    return menu
 
 def main():
     Setup()
@@ -191,6 +221,7 @@ def main():
     pannable_area = hildon.PannableArea()
     pannable_area.add_with_viewport(timeline.box)
 
+    win.set_app_menu(create_menu(pannable_area, timeline))
     win.add(pannable_area)
     win.show_all()
 

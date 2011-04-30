@@ -7,7 +7,7 @@ import settings
 class Notice():
 
     def __init__(self, id=0, author='', message='', tstamp='', avatar_url=None,
-                 highlighted=0, read=0):
+                 highlighted=False, read=False):
         self.id = int(id) # Notice id
         self.author = author
         self.avatar_url = None
