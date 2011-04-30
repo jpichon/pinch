@@ -1,23 +1,24 @@
 import logging
 import os
+import sqlite3
 
 import gtk
 import hildon
 from pango import WRAP_WORD_CHAR
 
-from models import Dent, DentLoader
+from models import Notice, NoticeLoader
 import settings
 
-class DentBox():
+class NoticeBox():
 
-    def __init__(self, dent, size_group=None):
-        self.dent = dent
+    def __init__(self, notice, size_group=None):
+        self.notice = notice
         self.size_group = size_group
 
-        self.box = self.create_dent_box()
+        self.box = self.create_notice_box()
 
     def mark_as_read(self, widget):
-        print "Marked as read until %s" % self.dent.id
+        print "Marked as read until %s" % self.notice.id
 
     def create_mark_as_read_button(self):
         button = hildon.Button(gtk.HILDON_SIZE_AUTO_WIDTH |
@@ -33,12 +34,12 @@ class DentBox():
         return button
 
     def create_message_box(self):
-        msg_label = gtk.Label(self.dent.message)
+        msg_label = gtk.Label(self.notice.message)
         msg_label.set_line_wrap(True)
         msg_label.set_alignment(0, 0)
 
         time_label = gtk.Label()
-        time_label.set_markup("<i>%s</i>" % self.dent.tstamp_datetime())
+        time_label.set_markup("<i>%s</i>" % self.notice.tstamp_datetime())
         time_label.set_alignment(0, 0)
 
         action_button = self.create_mark_as_read_button()
@@ -59,7 +60,7 @@ class DentBox():
 
     def wrap_author_name(self):
         max_length = 20
-        author = self.dent.author
+        author = self.notice.author
         wrapped = ''
         for i in range(0, max_length, 10):
             wrapped += author[i:i+10] + "\n"
@@ -85,13 +86,13 @@ class DentBox():
 
         return name_box
 
-    def create_dent_box(self):
-        dent_box = gtk.HBox(False, 0)
-        dent_box.pack_start(self.create_name_box(), False, False, 2)
-        dent_box.pack_start(self.create_message_box(), True, True, 0)
+    def create_notice_box(self):
+        notice_box = gtk.HBox(False, 0)
+        notice_box.pack_start(self.create_name_box(), False, False, 2)
+        notice_box.pack_start(self.create_message_box(), True, True, 0)
 
         padded_box = gtk.VBox(False)
-        padded_box.pack_start(dent_box, False, False, 10)
+        padded_box.pack_start(notice_box, False, False, 10)
 
         return padded_box
 
@@ -100,25 +101,79 @@ class TimelineView():
     size_group = gtk.SizeGroup(gtk.SIZE_GROUP_HORIZONTAL)
 
     def __init__(self):
-        self.dents = self.fetch_dents()
+        self.notices = self.fetch_notices()
         self.box = self.create_timeline()
 
     def create_timeline(self):
         vbox = gtk.VBox(False, 0)
 
-        for dent in self.dents:
-            dent = DentBox(dent, self.size_group)
-            vbox.pack_start(dent.box, False, False, 0)
+        for notice in self.notices:
+            notice = NoticeBox(notice, self.size_group)
+            vbox.pack_start(notice.box, False, False, 0)
 
         return vbox
 
-    def fetch_dents(self):
-        loader = DentLoader()
-        return loader.dents
+    def fetch_notices(self):
+        loader = NoticeLoader()
+        return loader.notices
+
+class Setup():
+
+    def __init__(self):
+        self.logger = logging.getLogger('Setup')
+
+        self.create_app_directory()
+        self.create_db()
+
+    def create_app_directory(self):
+        if not os.path.exists(os.path.expanduser(settings.data_path)):
+            os.system('mkdir -p ' + os.path.expanduser(settings.data_path))
+
+    def create_db(self):
+        if not os.path.exists(os.path.expanduser(settings.data_path)):
+            self.logger.info('Creating app path')
+            os.system('mkdir -p ' + os.path.expanduser(settings.data_path))
+
+        if not os.path.exists(settings.db_path):
+            self.logger.info('Create app database')
+            conn = sqlite3.connect(settings.db_path)
+            conn.execute("""create table notices
+                      (id int,
+                       author text,
+                       message text,
+                       tstamp text,
+                       avatar_url text default '',
+                       highlighted int default 0,
+                       read int default 0)""")
+            conn.execute("create table config (name text, value text)")
+            conn.commit()
+            conn.close()
+
+            if settings.debug:
+                self.create_fake_notices()
+
+    def create_fake_notices(self):
+        self.logger.debug("Creating fake notices")
+        notices = []
+
+        notices.append(Notice(1, "bob", "I like cheese!", "2011-04-25T14:00:14+00:00"))
+        notices.append(Notice(2, "alice", "Cool atmo at #RandomConference", "2011-04-25T13:54:00+00:00"))
+        notices.append(Notice(3, "someonewitharidiculouslylongnameabcdefghijklmnopqrstuvwxyz", "lol", "2011-04-25T13:40:40+00:00"))
+        notices.append(Notice(4, "Lort43", "An effort at writing a message that is one hundred and forty characters long, a message that is one hundred and forty characters long. Yes!", "2011-04-25T13:12:04+00:00"))
+
+        conn = sqlite3.connect(settings.db_path)
+
+        for notice in notices:
+            conn.execute("insert into notices values (?, ?, ?, ?, ?, ?, ?)",
+                      (notice.id, notice.author, notice.message, notice.tstamp, '', 0, 0))
+
+        conn.commit()
+        conn.close()
+
+        return notices
 
 def main():
-    if not os.path.exists(os.path.expanduser(settings.data_path)):
-            os.system('mkdir -p ' + os.path.expanduser(settings.data_path))
+    Setup()
 
     logging.basicConfig(filename=os.path.expanduser(settings.log_file),
                         filemode='w',

@@ -1,88 +1,56 @@
 from datetime import datetime
 import logging
-import os
 import sqlite3
 
 import settings
 
-class Dent():
+class Notice():
 
-    def __init__(self, id='', author='', message='', tstamp=''):
-        self.id = id
+    def __init__(self, id=0, author='', message='', tstamp='', avatar_url=None,
+                 highlighted=0, read=0):
+        self.id = int(id) # Notice id
         self.author = author
+        self.avatar_url = None
         self.message = message
         self.tstamp = tstamp
+        self.highlighted = highlighted
+        self.read = read
 
     def tstamp_datetime(self):
         return datetime.strptime(self.tstamp[:-6], '%Y-%m-%dT%H:%M:%S')
 
-    def __repr__(self):
-        return u'#%d %s: %s (%s)' % (self.id,
-                                     self.author,
-                                     self.message,
-                                     self.tstamp)
+    def __str__(self):
+        notice = '#%d %s: %s (%s)' % (self.id,
+                                      self.author,
+                                      self.message,
+                                      self.tstamp)
+        return unicode(notice).encode("utf-8")
 
-class DentLoader():
+class NoticeLoader():
 
     def __init__(self):
-        self.dents = []
-        self.db_path = os.path.expanduser(settings.db_path)
-        self.logger = logging.getLogger('DentLoader')
+        self.notices = []
+        self.logger = logging.getLogger('NoticeLoader')
 
-        self.load_dents()
+        self.load_notices()
 
-    def load_dents(self):
-        if not os.path.exists(self.db_path):
-            self._create_db()
-
-        conn = sqlite3.connect(self.db_path)
-        c = conn.cursor()
-        c.execute("select * from dents order by tstamp desc")
+    def load_notices(self):
+        sql = """select id, author, avatar_url, message, tstamp,
+                        highlighted, read
+                 from notices
+                 order by tstamp desc"""
+        conn = sqlite3.connect(settings.db_path)
+        c = conn.execute(sql)
 
         for row in c:
-            d = Dent(id=row[0], author=row[1], message=row[2], tstamp=row[3])
-            self.logger.debug('Dent fetched from db: ' + str(d))
-            self.dents.append(d)
+            d = Notice(id=row[0],
+                       author=row[1],
+                       avatar_url=row[2],
+                       message=row[3],
+                       tstamp=row[4],
+                       highlighted=row[5],
+                       read=row[6])
+            self.logger.debug('Notice fetched from db: ' + str(d))
+            self.notices.append(d)
 
-        c.close()
         conn.close()
-
-    def _create_db(self):
-        if not os.path.exists(os.path.expanduser(settings.data_path)):
-            self.logger.info('Creating app path')
-            os.system('mkdir -p ' + os.path.expanduser(settings.data_path))
-
-        if not os.path.exists(self.db_path):
-            self.logger.info('Create app database')
-            conn = sqlite3.connect(self.db_path)
-            c = conn.cursor()
-            c.execute("""create table dents
-                      (id int, author text, message text, tstamp text)""")
-            conn.commit()
-            c.close()
-            conn.close()
-
-        if settings.debug:
-            self.create_fake_dents()
-
-    def create_fake_dents(self):
-        self.logger.debug("Creating fake dents")
-        dents = []
-
-        dents.append(Dent(1, "bob", "I like cheese!", "2011-04-25T14:00:14+00:00"))
-        dents.append(Dent(2, "alice", "Cool atmo at #RandomConference", "2011-04-25T13:54:00+00:00"))
-        dents.append(Dent(3, "someonewitharidiculouslylongnameabcdefghijklmnopqrstuvwxyz", "lol", "2011-04-25T13:40:40+00:00"))
-        dents.append(Dent(4, "Lort43", "An effort at writing a message that is one hundred and forty characters long, a message that is one hundred and forty characters long. Yes!", "2011-04-25T13:12:04+00:00"))
-
-        conn = sqlite3.connect(self.db_path)
-        c = conn.cursor()
-
-        for dent in dents:
-            c.execute("insert into dents values (?, ?, ?, ?)",
-                      (dent.id, dent.author, dent.message, dent.tstamp))
-
-        conn.commit()
-        c.close()
-        conn.close()
-
-        return dents
