@@ -11,6 +11,8 @@ import settings
 
 class NoticeBox():
 
+    read_markup = '<span foreground="#808080">%s</span>'
+
     def __init__(self, notice, size_group=None):
         self.notice = notice
         self.size_group = size_group
@@ -46,7 +48,12 @@ class NoticeBox():
 
         hbox = gtk.HBox(False, 0)
         hbox.pack_start(time_label, False, False, 0)
-        hbox.pack_end(action_button, False, False, 50)
+
+        if self.notice.read:
+            msg_label.set_markup(self.read_markup % msg_label.get_label())
+            time_label.set_markup(self.read_markup % time_label.get_label())
+        else:
+            hbox.pack_end(action_button, False, False, 50)
 
         sep = gtk.HSeparator()
         sep.set_size_request(gtk.HILDON_SIZE_FULLSCREEN_WIDTH, 2)
@@ -79,6 +86,9 @@ class NoticeBox():
 
         label_box = gtk.HBox(False, 0)
         label_box.pack_start(name_label, False, False, 10)
+
+        if self.notice.read:
+            name_label.set_markup(self.read_markup % name_label.get_label())
 
         name_box = gtk.VBox(False, 0)
         name_box.pack_start(avatar, False, False, 0)
@@ -224,6 +234,8 @@ def main():
     win.set_app_menu(create_menu(pannable_area, timeline))
     win.add(pannable_area)
     win.show_all()
+
+    pannable_area.scroll_to_child(timeline.first_unread)
 
     gtk.main()
 
