@@ -200,13 +200,14 @@ class Setup():
         self.create_db()
 
     def create_app_directory(self):
-        if not os.path.exists(os.path.expanduser(settings.data_path)):
-            os.system('mkdir -p ' + os.path.expanduser(settings.data_path))
+        if not os.path.exists(settings.data_path):
+            self.logger.info('Creating app directory')
+            os.makedirs(settings.data_path)
 
     def create_db(self):
-        if not os.path.exists(os.path.expanduser(settings.data_path)):
+        if not os.path.exists(settings.data_path):
             self.logger.info('Creating app path')
-            os.system('mkdir -p ' + os.path.expanduser(settings.data_path))
+            os.makedirs(settings.data_path)
 
         if not os.path.exists(settings.db_path):
             self.logger.info('Create app database')

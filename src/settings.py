@@ -2,7 +2,7 @@ import os
 
 app_name = 'Pinch'
 
-data_path = os.path.expanduser('~/.' + app_name)
+data_path = os.path.expanduser('~/.' + app_name.lower())
 db_name = 'data.db'
 db_path =  data_path + '/' + db_name
 
