@@ -16,10 +16,10 @@ class NoSuchUserException(Exception):
         return repr(self.value)
 
 
-class DentFetcher():
+class NoticeFetcher():
 
     def __init__(self, user, base_url='http://identi.ca'):
-        self.logger = logging.getLogger('DentFetcher')
+        self.logger = logging.getLogger('NoticeFetcher')
         self.user = user
         self.base_url = base_url
 
@@ -51,6 +51,7 @@ class DentFetcher():
             self.conn.execute(sql, ('user', self.user))
             self.conn.commit()
             self.conn.execute(sql, ('user_id', self.user_id))
+            self.conn.execute("delete from notices")
             self.conn.commit()
         else:
             c = self.conn.execute("select value from config where name=?",
@@ -59,7 +60,9 @@ class DentFetcher():
 
             sql = "select id from notices order by tstamp desc limit 1"
             c = self.conn.execute(sql)
-            self.since_id = c.fetchone()[0]
+            result = c.fetchone()
+            if result is not None:
+                self.since_id = result[0]
 
     def _fetch_user_id(self):
         url = '%s/api/statusnet/app/service/%s.xml' % (self.base_url, self.user)
@@ -93,15 +96,14 @@ class DentFetcher():
             raise Exception("Could not fetch user information: %s", e)
 
     def fetch(self):
-        user_id = self.get_user_id()
-
-        if self.since_id is None:
-            url = ('%s/api/statuses/home_timeline/%s.atom'
-                   % (self.base_url, user_id))
+        if self.since_id is not None:
+            self.fetch_since(self.since_id)
         else:
-            since_id = self.since_id
-            url = ('%s/api/statuses/home_timeline/%s.atom?since_id=%d'
-                   % (self.base_url, user_id, since_id))
+            self.fetch_latest()
+
+    def fetch_latest(self):
+        user_id = self.get_user_id()
+        url = '%s/api/statuses/home_timeline/%s.atom' % (self.base_url, user_id)
 
         if user_id is None:
             return
@@ -120,14 +122,67 @@ class DentFetcher():
             self.logger.error("Could not fetch notices from url %s: %s (%s)",
                               url, str(type(e)), e)
 
+    def fetch_since(self, since_id):
+        user_id = self.get_user_id()
+        max_id = 0
+        url = '%s/api/statuses/home_timeline/%s.atom?max_id=%s&since_id=%s'
+
+        if user_id is None:
+            return
+
+        if since_id is None:
+            return self.fetch_latest()
+
+        current_url = ''
+        new_notices_count = 100
+        # TODO: Add a limit (100 messages or something)
+        while new_notices_count > 1:
+            try:
+                current_url = url % (self.base_url, user_id, max_id, since_id)
+                self.logger.debug('Fetching notices feed %s' % current_url)
+                response = urllib.urlopen(current_url)
+
+                np = NoticeParser(response)
+                notices = np.parse()
+                self.store_notices(notices)
+
+                new_notices_count = len(notices)
+                if new_notices_count > 0:
+                    max_id = notices[-1].id
+
+            except Exception, e:
+                print type(e), e
+                self.logger.error(
+                    "Could not fetch notices from url %s: %s (%s)",
+                    current_url,
+                    str(type(e)),
+                    e)
+
     def store_notices(self, notices):
+        # Avoid duplicates
+        ids = self.get_existing_ids()
+
         for n in notices:
-            sql = """insert into notices
+            if n.id not in ids:
+                sql = """insert into notices
                           (id, author, avatar_url, message, tstamp)
                           values (?, ?, ?, ?, ?)"""
-            self.conn.execute(sql, (n.id, n.author, n.avatar_url, n.message, n.tstamp))
+                self.conn.execute(sql, (n.id,
+                                        n.author,
+                                        n.avatar_url,
+                                        n.message,
+                                        n.tstamp))
         self.conn.commit()
 
+    def get_existing_ids(self):
+        ids = []
+
+        c = self.conn.execute("SELECT id from notices")
+        results = c.fetchall()
+        for res in results:
+            ids.append(res[0])
+
+        return ids
 
 class NoticeParser():
 
@@ -176,5 +231,5 @@ class NoticeParser():
         return Notice(id, author, message, tstamp, avatar_url)
 
 if __name__ == '__main__':
-    df = DentFetcher(settings.user)
-    df.fetch()
+    nf = NoticeFetcher(settings.user)
+    nf.fetch()

@@ -141,7 +141,10 @@ class TimelineView():
         self.box = self.create_timeline()
 
         if self.first_unread is None:
-            self.first_unread = self.box
+            if len(self.notice_boxes) > 0:
+                self.first_unread = self.notice_boxes[-1].box
+            else:
+                self.first_unread = self.box
 
     def create_timeline(self):
         vbox = gtk.VBox(False, 0)
@@ -196,7 +199,7 @@ class Setup():
             self.logger.info('Create app database')
             conn = sqlite3.connect(settings.db_path)
             conn.execute("""create table notices
-                      (id int,
+                      (id int unique,
                        author text,
                        message text,
                        tstamp text,
@@ -223,7 +226,8 @@ class Setup():
 
         for notice in notices:
             conn.execute("insert into notices values (?, ?, ?, ?, ?, ?, ?)",
-                      (notice.id, notice.author, notice.message, notice.tstamp, '', 0, notice.read))
+                         (notice.id, notice.author, notice.message,
+                          notice.tstamp, '', 0, notice.read))
 
         conn.commit()
         conn.close()
@@ -231,7 +235,7 @@ class Setup():
         return notices
 
 def remove_read_dents(widget):
-    hildon.hildon_banner_show_information(widget, '', "Removing read dents")
+    hildon.hildon_banner_show_information(widget, '', "Removing read notices")
     sql = "delete from notices where read = 1 and highlighted = 0"
     conn = sqlite3.connect(settings.db_path)
     conn.execute(sql, (self.notice.tstamp,))
