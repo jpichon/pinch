@@ -169,15 +169,23 @@ class TimelineView():
 
         return vbox
 
+    def fetch_notices(self):
+        loader = NoticeLoader()
+        return loader.notices
+
     def find_first_unread(self):
         for notice_box in self.notice_boxes:
             if not notice_box.notice.read:
                 self.first_unread = notice_box.box
                 break
+        return None
 
-    def fetch_notices(self):
-        loader = NoticeLoader()
-        return loader.notices
+    def remove_read_notices(self):
+        for notice_box in self.notice_boxes:
+            if notice_box.notice.read:
+                notice_box.box.destroy()
+        self.notice_boxes[:] = [nb for nb in self.notice_boxes
+                                if not nb.notice.read]
 
 class Setup():
 
@@ -235,13 +243,14 @@ class Setup():
 
         return notices
 
-def remove_read_dents(widget):
+def remove_read_notices(widget, timeline):
     hildon.hildon_banner_show_information(widget, '', "Removing read notices")
     sql = "delete from notices where read = 1 and highlighted = 0"
     conn = sqlite3.connect(settings.db_path)
     conn.execute(sql)
     conn.commit()
     conn.close()
+    timeline.remove_read_notices()
 
 def jump_to_unread(widget, pannable_area, timeline):
     pannable_area.scroll_to_child(timeline.first_unread)
@@ -250,7 +259,7 @@ def create_menu(pannable_area, timeline):
     menu = hildon.AppMenu()
 
     rm_read_button = gtk.Button('Remove read')
-    rm_read_button.connect("clicked", remove_read_dents)
+    rm_read_button.connect("clicked", remove_read_notices, timeline)
     jump_unread_button = gtk.Button('Jump to unread')
     jump_unread_button.connect("clicked",
                                jump_to_unread,
@@ -277,7 +286,7 @@ def main():
     win.set_title(settings.app_name)
     win.connect("destroy", gtk.main_quit, None)
 
-    # settings.user is hardcoded for now
+    # TODO: settings.user is hardcoded for now
     nf = NoticeFetcher(settings.user)
     nf.fetch()
 
