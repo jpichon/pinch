@@ -215,7 +215,7 @@ class Setup():
                        avatar_url text default '',
                        highlighted int default 0,
                        read int default 0)""")
-            conn.execute("create table config (name text, value text)")
+            conn.execute("create table config (name text unique, value text)")
             conn.commit()
             conn.close()
 

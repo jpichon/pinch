@@ -26,8 +26,9 @@ class NoticeFetcher():
         self.conn = sqlite3.connect(settings.db_path)
 
         self.user_id = None
-        self.since_id = None
         self._load_user_id()
+        self.since_id = None
+        self._load_since_id()
 
     def get_user_id(self):
         if self.user_id is None:
@@ -45,12 +46,13 @@ class NoticeFetcher():
 
             if value is None:
                 sql = "insert into config values (?, ?)"
+                self.conn.execute(sql, ('user', self.user))
+                self.conn.execute(sql, ('user_id', self.user_id))
             else:
-                sql = "update config set name=?, value=?"
+                sql = "update config set value=? where name=?"
+                self.conn.execute(sql, (self.user, 'user'))
+                self.conn.execute(sql, (self.user_id, 'user_id'))
 
-            self.conn.execute(sql, ('user', self.user))
-            self.conn.commit()
-            self.conn.execute(sql, ('user_id', self.user_id))
             self.conn.execute("delete from notices")
             self.conn.commit()
         else:
@@ -58,11 +60,34 @@ class NoticeFetcher():
                                   ('user_id',))
             self.user_id = c.fetchone()[0]
 
-            sql = "select id from notices order by tstamp desc limit 1"
-            c = self.conn.execute(sql)
-            result = c.fetchone()
-            if result is not None:
-                self.since_id = result[0]
+    def get_since_id(self):
+        if self.since_id is not None:
+            return self.since_id
+        else:
+            self._load_since_id
+
+    def _load_since_id(self):
+        sql = "select value from config where name=?"
+        c = self.conn.execute(sql, ('since_id',))
+        result = c.fetchone()
+
+        if result is not None:
+            self.since_id = result[0]
+        else:
+            sql = "insert into config values (?, ?)"
+            self.conn.execute(sql, ('since_id', '0'))
+            self.conn.commit()
+
+    def update_since_id(self):
+        sql = "select id from notices order by tstamp desc limit 1"
+        c = self.conn.execute(sql)
+        result = c.fetchone()
+
+        if result is not None:
+            sql = "update config set value=? where name=?"
+            self.conn.execute(sql, (result[0], 'since_id'))
+            self.conn.commit()
+            self.since_id = result[0]
 
     def _fetch_user_id(self):
         url = '%s/api/statusnet/app/service/%s.xml' % (self.base_url, self.user)
@@ -96,10 +121,12 @@ class NoticeFetcher():
             raise Exception("Could not fetch user information: %s", e)
 
     def fetch(self):
-        if self.since_id is not None:
-            self.fetch_since(self.since_id)
-        else:
+        if self.since_id is None or self.since_id == 0:
             self.fetch_latest()
+        else:
+            self.fetch_since(self.since_id)
+
+        self.update_since_id()
 
     def fetch_latest(self):
         user_id = self.get_user_id()
@@ -159,8 +186,9 @@ class NoticeFetcher():
                     e)
 
     def store_notices(self, notices):
-        # Avoid duplicates
         ids = self.get_existing_ids()
+        if self.since_id != None:
+            ids.append(self.since_id)
 
         for n in notices:
             if n.id not in ids:
