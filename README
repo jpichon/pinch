@@ -1,0 +1,22 @@
+Pinch is a micro-blogging reader (with bits of writing to come later
+on) for identi.ca written for the Maemo platform/N900.
+
+To run in Scratchbox:
+* Make sure to have scratchbox installed [0] with the Python
+  environment [1]
+* Untar the source, then run:
+  $ run-standalone.sh python2.5 src/base.py
+
+To run on the N900:
+* Make sure to have the Python environment installed [2]
+* Untar the source, then from the command-line on the phone:
+  $ python2.5 src/base.py
+
+Debs to come later. Get in touch if you can't get it working, this is
+very much a work in progress.
+
+
+[0] http://wiki.maemo.org/Documentation/Maemo_5_Final_SDK_Installation
+[1] http://wiki.maemo.org/PyMaemo/Quick_start_guide, except installing
+maemo-python-env rather than maemo-python-device env
+[2] http://wiki.maemo.org/PyMaemo/Quick_start_guide
