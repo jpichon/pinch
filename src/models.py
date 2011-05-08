@@ -10,7 +10,7 @@ class Notice():
                  highlighted=False, read=False):
         self.id = int(id) # Notice id
         self.author = author
-        self.avatar_url = None
+        self.avatar_url = avatar_url
         self.message = message
         self.tstamp = tstamp
         self.highlighted = highlighted

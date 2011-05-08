@@ -1,6 +1,7 @@
 import logging
 import os
 import sqlite3
+from urllib import urlretrieve
 
 import gtk
 import hildon
@@ -101,8 +102,7 @@ class NoticeBox():
         return wrapped
 
     def create_name_box(self):
-        avatar = gtk.Image()
-        avatar.set_from_icon_name(gtk.STOCK_MISSING_IMAGE, gtk.ICON_SIZE_BUTTON)
+        avatar = self.load_avatar()
         name_label = gtk.Label(self.wrap_author_name())
         name_label.set_line_wrap_mode(WRAP_WORD_CHAR)
         name_label.set_line_wrap(True)
@@ -120,6 +120,21 @@ class NoticeBox():
         name_box.pack_start(label_box, False, False, 0)
 
         return name_box
+
+    def load_avatar(self):
+        img_path = settings.cache_path + '/%s.png' % self.notice.author
+
+        if not os.path.exists(settings.cache_path):
+            os.makedirs(settings.cache_path)
+
+        if not os.path.exists(img_path):
+            if self.notice.avatar_url:
+                urlretrieve(self.notice.avatar_url, img_path)
+
+        avatar = gtk.Image()
+        avatar.set_from_file(img_path)
+
+        return avatar
 
     def create_notice_box(self):
         notice_box = gtk.HBox(False, 0)
