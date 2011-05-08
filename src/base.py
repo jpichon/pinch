@@ -13,21 +13,45 @@ class NoticeBox():
 
     read_markup = '<span foreground="#808080">%s</span>'
 
-    def __init__(self, notice, size_group=None):
+    def __init__(self, notice, parent, previous=None, size_group=None):
         self.notice = notice
+        self.parent = parent
+        self.previous = previous
         self.size_group = size_group
 
         self.box = self.create_notice_box()
 
-    def mark_as_read(self, widget):
-        print "Marked as read until %s" % self.notice.id
+    def mark_all_as_read(self, widget):
+        sql = "update notices set read = 1 where tstamp <= ?"
+        conn = sqlite3.connect(settings.db_path)
+        conn.execute(sql, (self.notice.tstamp,))
+        conn.commit()
+        conn.close()
+
+        self.redraw_all_as_read()
+        self.parent.find_first_unread()
+
+    def redraw_all_as_read(self):
+        if not self.notice.read:
+            self.notice.read = True
+            self.box.remove(self.box.get_children()[0])
+
+            notice_box = gtk.HBox(False, 0)
+            notice_box.pack_start(self.create_name_box(), False, False, 2)
+            notice_box.pack_start(self.create_message_box(), True, True, 0)
+
+            self.box.pack_start(notice_box, False, False, 10)
+            self.box.show_all()
+
+            if self.previous is not None:
+                self.previous.redraw_all_as_read()
 
     def create_mark_as_read_button(self):
         button = hildon.Button(gtk.HILDON_SIZE_AUTO_WIDTH |
                                gtk.HILDON_SIZE_FINGER_HEIGHT,
                                hildon.BUTTON_ARRANGEMENT_VERTICAL)
         button.set_text("", "Mark all as read so far")
-        button.connect("clicked", self.mark_as_read)
+        button.connect("clicked", self.mark_all_as_read)
 
         image = gtk.image_new_from_stock(gtk.STOCK_APPLY, gtk.ICON_SIZE_BUTTON)
         button.set_image(image)
@@ -112,8 +136,10 @@ class TimelineView():
     first_unread = None
 
     def __init__(self):
+        self.notice_boxes = []
         self.notices = self.fetch_notices()
         self.box = self.create_timeline()
+
         if self.first_unread is None:
             self.first_unread = self.box
 
@@ -121,14 +147,29 @@ class TimelineView():
         vbox = gtk.VBox(False, 0)
 
         found = False
+        previous = None
+
         for notice in self.notices:
-            notice_box = NoticeBox(notice, self.size_group)
+            notice_box = NoticeBox(notice=notice,
+                                   parent=self,
+                                   previous=previous,
+                                   size_group=self.size_group)
             vbox.pack_start(notice_box.box, False, False, 0)
+
+            previous = notice_box
+            self.notice_boxes.append(notice_box)
+
             if not found and notice.read == False:
                 self.first_unread = notice_box.box
                 found = True
 
         return vbox
+
+    def find_first_unread(self):
+        for notice_box in self.notice_boxes:
+            if not notice_box.notice.read:
+                self.first_unread = notice_box.box
+                break
 
     def fetch_notices(self):
         loader = NoticeLoader()
@@ -173,10 +214,10 @@ class Setup():
         self.logger.debug("Creating fake notices")
         notices = []
 
-        notices.append(Notice(1, "bob", "I like cheese!", "2011-04-25T14:00:14+00:00", None, False, True))
-        notices.append(Notice(2, "alice", "Cool atmo at #RandomConference", "2011-04-25T13:54:00+00:00", None, False, True))
+        notices.append(Notice(1, "bob", "I like cheese!", "2011-04-25T14:00:14+00:00"))
+        notices.append(Notice(2, "alice", "Cool atmo at #RandomConference", "2011-04-25T13:54:00+00:00"))
         notices.append(Notice(3, "someonewitharidiculouslylongnameabcdefghijklmnopqrstuvwxyz", "lol", "2011-04-25T13:40:40+00:00"))
-        notices.append(Notice(4, "Lort43", "An effort at writing a message that is one hundred and forty characters long, a message that is one hundred and forty characters long. Yes!", "2011-04-25T13:12:04+00:00"))
+        notices.append(Notice(4, "Lort43", "An effort at writing a message that is one hundred and forty characters long, a message that is one hundred and forty characters long. Yes!", "2011-04-25T13:12:04+00:00", None, False, True))
 
         conn = sqlite3.connect(settings.db_path)
 
@@ -191,6 +232,11 @@ class Setup():
 
 def remove_read_dents(widget):
     hildon.hildon_banner_show_information(widget, '', "Removing read dents")
+    sql = "delete from notices where read = 1 and highlighted = 0"
+    conn = sqlite3.connect(settings.db_path)
+    conn.execute(sql, (self.notice.tstamp,))
+    conn.commit()
+    conn.close()
 
 def jump_to_unread(widget, pannable_area, timeline):
     pannable_area.scroll_to_child(timeline.first_unread)

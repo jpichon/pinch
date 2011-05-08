@@ -38,7 +38,7 @@ class NoticeLoader():
         sql = """select id, author, avatar_url, message, tstamp,
                         highlighted, read
                  from notices
-                 order by tstamp desc"""
+                 order by tstamp"""
         conn = sqlite3.connect(settings.db_path)
         c = conn.execute(sql)
 

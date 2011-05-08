@@ -148,6 +148,7 @@ class NoticeParser():
         author = author_info.find(self.ATOM + 'name').text
         tstamp = entry.find(self.ATOM + 'published').text
         message = entry.find(self.ATOM + 'title').text
+        message = message.replace('&', '&amp;')
 
         avatar_url = ''
         for link in author_info.findall(self.ATOM + 'link'):
