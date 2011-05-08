@@ -167,6 +167,10 @@ class TimelineView():
                 self.first_unread = notice_box.box
                 found = True
 
+        if len(self.notices) == 0:
+            label = gtk.Label("No new notices.")
+            vbox.pack_start(label)
+
         return vbox
 
     def fetch_notices(self):
