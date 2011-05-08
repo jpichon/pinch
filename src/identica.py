@@ -26,6 +26,7 @@ class DentFetcher():
         self.conn = sqlite3.connect(settings.db_path)
 
         self.user_id = None
+        self.since_id = None
         self._load_user_id()
 
     def get_user_id(self):
@@ -55,6 +56,10 @@ class DentFetcher():
             c = self.conn.execute("select value from config where name=?",
                                   ('user_id',))
             self.user_id = c.fetchone()[0]
+
+            sql = "select id from notices order by tstamp desc limit 1"
+            c = self.conn.execute(sql)
+            self.since_id = c.fetchone()[0]
 
     def _fetch_user_id(self):
         url = '%s/api/statusnet/app/service/%s.xml' % (self.base_url, self.user)
@@ -89,7 +94,14 @@ class DentFetcher():
 
     def fetch(self):
         user_id = self.get_user_id()
-        url = '%s/api/statuses/home_timeline/%s.atom' % (self.base_url, user_id)
+
+        if self.since_id is None:
+            url = ('%s/api/statuses/home_timeline/%s.atom'
+                   % (self.base_url, user_id))
+        else:
+            since_id = self.since_id
+            url = ('%s/api/statuses/home_timeline/%s.atom?since_id=%d'
+                   % (self.base_url, user_id, since_id))
 
         if user_id is None:
             return
@@ -101,16 +113,21 @@ class DentFetcher():
             np = NoticeParser(response)
             notices = np.parse()
 
-            for n in notices:
-                sql = """insert into notices
-                          (id, author, avatar_url, message, tstamp)
-                          values (?, ?, ?, ?, ?)"""
-                self.conn.execute(sql, (n.id, n.author, n.avatar_url, n.message, n.tstamp))
-            self.conn.commit()
+            self.store_notices(notices)
+
         except Exception, e:
             print type(e), e
             self.logger.error("Could not fetch notices from url %s: %s (%s)",
                               url, str(type(e)), e)
+
+    def store_notices(self, notices):
+        for n in notices:
+            sql = """insert into notices
+                          (id, author, avatar_url, message, tstamp)
+                          values (?, ?, ?, ?, ?)"""
+            self.conn.execute(sql, (n.id, n.author, n.avatar_url, n.message, n.tstamp))
+        self.conn.commit()
+
 
 class NoticeParser():
 
