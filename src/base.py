@@ -239,7 +239,7 @@ def remove_read_dents(widget):
     hildon.hildon_banner_show_information(widget, '', "Removing read notices")
     sql = "delete from notices where read = 1 and highlighted = 0"
     conn = sqlite3.connect(settings.db_path)
-    conn.execute(sql, (self.notice.tstamp,))
+    conn.execute(sql)
     conn.commit()
     conn.close()
 
