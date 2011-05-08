@@ -18,6 +18,8 @@ class NoSuchUserException(Exception):
 
 class NoticeFetcher():
 
+    MAX_NOTICES = 100
+
     def __init__(self, user, base_url='http://identi.ca'):
         self.logger = logging.getLogger('NoticeFetcher')
         self.user = user
@@ -161,9 +163,10 @@ class NoticeFetcher():
             return self.fetch_latest()
 
         current_url = ''
-        new_notices_count = 100
-        # TODO: Add a limit (100 messages or something)
-        while new_notices_count > 1:
+        retrieved = 0
+        new_notices_count = 2
+
+        while new_notices_count > 1 and retrieved < self.MAX_NOTICES:
             try:
                 current_url = url % (self.base_url, user_id, max_id, since_id)
                 self.logger.debug('Fetching notices feed %s' % current_url)
@@ -176,6 +179,8 @@ class NoticeFetcher():
                 new_notices_count = len(notices)
                 if new_notices_count > 0:
                     max_id = notices[-1].id
+
+                retrieved += new_notices_count
 
             except Exception, e:
                 print type(e), e
