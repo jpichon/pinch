@@ -7,6 +7,7 @@ import hildon
 from pango import WRAP_WORD_CHAR
 
 from models import Notice, NoticeLoader
+from identica import NoticeFetcher
 import settings
 
 class NoticeBox():
@@ -275,6 +276,10 @@ def main():
     win = hildon.StackableWindow()
     win.set_title(settings.app_name)
     win.connect("destroy", gtk.main_quit, None)
+
+    # settings.user is hardcoded for now
+    nf = NoticeFetcher(settings.user)
+    nf.fetch()
 
     timeline = TimelineView()
 
