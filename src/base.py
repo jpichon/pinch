@@ -14,6 +14,7 @@ import settings
 class NoticeBox():
 
     read_markup = '<span foreground="#808080">%s</span>'
+    hilight_markup = '<span foreground="#FDD017">%s</span>'
 
     def __init__(self, notice, parent, previous=None, size_group=None):
         self.notice = notice
@@ -22,6 +23,21 @@ class NoticeBox():
         self.size_group = size_group
 
         self.box = self.create_notice_box()
+
+    def highlight_action(self, widget, event):
+        if self.notice.highlighted:
+            self.notice.highlighted = False
+            sql = "update notices set highlighted = 0 where id=?"
+        else:
+            self.notice.highlighted = True
+            sql = "update notices set highlighted = 1 where id=?"
+
+        conn = sqlite3.connect(settings.db_path)
+        conn.execute(sql, (self.notice.id,))
+        conn.commit()
+        conn.close()
+
+        self.redraw()
 
     def mark_all_as_read(self, widget):
         sql = "update notices set read = 1 where tstamp <= ?"
@@ -36,17 +52,20 @@ class NoticeBox():
     def redraw_all_as_read(self):
         if not self.notice.read:
             self.notice.read = True
-            self.box.remove(self.box.get_children()[0])
-
-            notice_box = gtk.HBox(False, 0)
-            notice_box.pack_start(self.create_name_box(), False, False, 2)
-            notice_box.pack_start(self.create_message_box(), True, True, 0)
-
-            self.box.pack_start(notice_box, False, False, 10)
-            self.box.show_all()
+            self.redraw()
 
             if self.previous is not None:
                 self.previous.redraw_all_as_read()
+
+    def redraw(self):
+        self.box.remove(self.box.get_children()[0])
+
+        notice_box = gtk.HBox(False, 0)
+        notice_box.pack_start(self.create_name_box(), False, False, 2)
+        notice_box.pack_start(self.create_message_box(), True, True, 0)
+
+        self.box.pack_start(notice_box, False, False, 10)
+        self.box.show_all()
 
     def create_mark_as_read_button(self):
         button = hildon.Button(gtk.HILDON_SIZE_AUTO_WIDTH |
@@ -75,10 +94,14 @@ class NoticeBox():
         hbox = gtk.HBox(False, 0)
         hbox.pack_start(time_label, False, False, 0)
 
-        if self.notice.read:
+        if self.notice.highlighted:
+            msg_label.set_markup(self.hilight_markup % msg_label.get_label())
+            time_label.set_markup(self.hilight_markup % time_label.get_label())
+        elif self.notice.read:
             msg_label.set_markup(self.read_markup % msg_label.get_label())
             time_label.set_markup(self.read_markup % time_label.get_label())
-        else:
+
+        if not self.notice.read:
             hbox.pack_end(action_button, False, False, 50)
 
         sep = gtk.HSeparator()
@@ -112,14 +135,25 @@ class NoticeBox():
         label_box = gtk.HBox(False, 0)
         label_box.pack_start(name_label, False, False, 10)
 
-        if self.notice.read:
+        if self.notice.highlighted:
+            name_label.set_markup(self.hilight_markup % name_label.get_label())
+        elif self.notice.read:
             name_label.set_markup(self.read_markup % name_label.get_label())
 
         name_box = gtk.VBox(False, 0)
+
+        if self.notice.highlighted:
+            image = self.get_highlighted_icon()
+            name_box.pack_start(image, False, False, 10)
+
         name_box.pack_start(avatar, False, False, 0)
         name_box.pack_start(label_box, False, False, 0)
 
-        return name_box
+        event_box = gtk.EventBox()
+        event_box.add(name_box)
+        event_box.connect('button-press-event', self.highlight_action)
+
+        return event_box
 
     def load_avatar(self):
         img_path = settings.cache_path + '/%s.png' % self.notice.author
@@ -136,8 +170,17 @@ class NoticeBox():
 
         return avatar
 
+    def get_highlighted_icon(self):
+        current_path = os.path.dirname(__file__)
+        img_path = os.path.join(os.path.dirname(__file__), '../data/star.png')
+
+        highlight = gtk.Image()
+        highlight.set_from_file(img_path)
+        return highlight
+
     def create_notice_box(self):
         notice_box = gtk.HBox(False, 0)
+
         notice_box.pack_start(self.create_name_box(), False, False, 2)
         notice_box.pack_start(self.create_message_box(), True, True, 0)
 
@@ -201,10 +244,11 @@ class TimelineView():
 
     def remove_read_notices(self):
         for notice_box in self.notice_boxes:
-            if notice_box.notice.read:
+            if notice_box.notice.read and not notice_box.notice.highlighted:
                 notice_box.box.destroy()
         self.notice_boxes[:] = [nb for nb in self.notice_boxes
-                                if not nb.notice.read]
+                                if not nb.notice.read
+                                or notice_box.notice.highlighted]
 
 class Setup():
 
