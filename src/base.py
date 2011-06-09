@@ -350,13 +350,18 @@ def main():
     win.set_title(settings.app_name)
     win.connect("destroy", gtk.main_quit, None)
 
+    pannable_area = hildon.PannableArea()
+
     # TODO: settings.user is hardcoded for now
-    nf = NoticeFetcher(settings.user)
-    nf.fetch()
+    try:
+        nf = NoticeFetcher(settings.user)
+        nf.fetch()
+    except Exception, e:
+        message = "Couldn't access network"
+        logging.critical("%s | %s" % (message, e))
+        hildon.hildon_banner_show_information(pannable_area, '', message)
 
     timeline = TimelineView()
-
-    pannable_area = hildon.PannableArea()
     pannable_area.add_with_viewport(timeline.box)
 
     win.set_app_menu(create_menu(pannable_area, timeline))
