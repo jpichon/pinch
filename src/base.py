@@ -370,10 +370,11 @@ def main():
 
     win.set_app_menu(create_menu(pannable_area, timeline))
     win.add(pannable_area)
+    # scroll_to_child doesn't work if show_all() called twiced without hiding
+    win.hide_all()
     win.show_all()
 
     hildon.hildon_gtk_window_set_progress_indicator(win, 0)
-
     pannable_area.scroll_to_child(timeline.first_unread)
 
     gtk.main()
