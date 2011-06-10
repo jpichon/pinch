@@ -147,7 +147,6 @@ class NoticeFetcher():
             self.store_notices(notices)
 
         except Exception, e:
-            print type(e), e
             self.logger.error("Could not fetch notices from url %s: %s (%s)",
                               url, str(type(e)), e)
 
@@ -183,7 +182,6 @@ class NoticeFetcher():
                 retrieved += new_notices_count
 
             except Exception, e:
-                print type(e), e
                 self.logger.error(
                     "Could not fetch notices from url %s: %s (%s)",
                     current_url,
