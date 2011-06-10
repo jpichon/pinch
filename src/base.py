@@ -351,6 +351,9 @@ def main():
     win.set_title(settings.app_name)
     win.connect("destroy", gtk.main_quit, None)
 
+    hildon.hildon_gtk_window_set_progress_indicator(win, 1)
+    win.show_all()
+
     pannable_area = hildon.PannableArea()
 
     # TODO: settings.user is hardcoded for now
@@ -368,6 +371,8 @@ def main():
     win.set_app_menu(create_menu(pannable_area, timeline))
     win.add(pannable_area)
     win.show_all()
+
+    hildon.hildon_gtk_window_set_progress_indicator(win, 0)
 
     pannable_area.scroll_to_child(timeline.first_unread)
 
