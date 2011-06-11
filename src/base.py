@@ -8,7 +8,7 @@ import hildon
 from pango import WRAP_WORD_CHAR
 
 from models import Notice, NoticeLoader
-from identica import NoticeFetcher
+from identica import NoticeFetcher, UserFetcher, NoSuchUserException
 import settings
 
 class NoticeBox():
@@ -308,18 +308,92 @@ class Setup():
         return notices
 
 def remove_read_notices(widget, timeline):
-    hildon.hildon_banner_show_information(widget, '', "Removing read notices")
     sql = "delete from notices where read = 1 and highlighted = 0"
     conn = sqlite3.connect(settings.db_path)
     conn.execute(sql)
     conn.commit()
     conn.close()
+
     timeline.remove_read_notices()
+    hildon.hildon_banner_show_information(widget, '', "Removed read notices")
 
 def jump_to_unread(widget, pannable_area, timeline):
     pannable_area.scroll_to_child(timeline.first_unread)
 
-def create_menu(pannable_area, timeline):
+def save_settings(widget, window, parent, entry):
+    user = entry.get_text()
+
+    conn = sqlite3.connect(settings.db_path)
+    c = conn.execute("select value from config where name=?", ('user',))
+    current_user = c.fetchone()
+
+    if current_user is not None and current_user[0] == user:
+        window.destroy()
+        return
+
+    # Get user id
+    try:
+        uf = UserFetcher(user)
+        user_id = uf.user_id
+
+        sql = "delete from config where name=? or name=? or name=?"
+        conn.execute(sql, ('user', 'user_id', 'since_id'))
+        sql = "insert into config values (?, ?)"
+        conn.execute(sql, ('user', user))
+        sql = "insert into config values (?, ?)"
+        conn.execute(sql, ('user_id', user_id))
+        sql = "delete from notices"
+        conn.execute(sql)
+        conn.commit()
+        conn.close()
+
+        hildon.hildon_banner_show_information(parent, '', "Settings saved.")
+
+        window.destroy()
+    except NoSuchUserException, nse:
+        message = "User does not exist."
+        hildon.hildon_banner_show_information(parent, '', message)
+    except Exception, e:
+        logging.error("Error getting user info | %s %s" % (str(type(e)), e))
+        message = "Couldn't get user information."
+        hildon.hildon_banner_show_information(parent, '', message)
+
+def configure(widget, win):
+    window = hildon.StackableWindow()
+    window.set_title(settings.app_name + " - Settings")
+
+    conn = sqlite3.connect(settings.db_path)
+    c = conn.execute("select value from config where name=?", ('user',))
+    user = c.fetchone()
+    conn.close()
+
+    label = gtk.Label("Username")
+    entry = hildon.Entry(gtk.HILDON_SIZE_AUTO)
+    entry.set_max_length(64)
+    if user is not None:
+        entry.set_text(user[0])
+
+    save_button = hildon.Button(gtk.HILDON_SIZE_AUTO_WIDTH |
+                                gtk.HILDON_SIZE_FINGER_HEIGHT,
+                                hildon.BUTTON_ARRANGEMENT_HORIZONTAL)
+    save_button.set_text("Save new settings", "")
+    save_button.connect("clicked", save_settings, window, win, entry)
+
+    uname_box = gtk.HBox(False, 0)
+    uname_box.pack_start(label, False, False, 20)
+    uname_box.pack_start(entry, True, True, 10)
+
+    save_box = gtk.HBox(False, 0)
+    save_box.pack_start(save_button, True, False, 0)
+
+    vbox = gtk.VBox(False, 0)
+    vbox.pack_start(uname_box, False, False, 20)
+    vbox.pack_start(save_box, False, False, 0)
+
+    window.add(vbox)
+    window.show_all()
+
+def create_menu(win, pannable_area, timeline):
     menu = hildon.AppMenu()
 
     rm_read_button = gtk.Button('Remove read')
@@ -329,9 +403,12 @@ def create_menu(pannable_area, timeline):
                                jump_to_unread,
                                pannable_area,
                                timeline)
+    settings_button = gtk.Button("Settings")
+    settings_button.connect("clicked", configure, win)
 
     menu.append(rm_read_button)
     menu.append(jump_unread_button)
+    menu.append(settings_button)
     menu.show_all()
 
     return menu
@@ -356,19 +433,33 @@ def main():
 
     pannable_area = hildon.PannableArea()
 
-    # TODO: settings.user is hardcoded for now
+    conn = sqlite3.connect(settings.db_path)
+    c = conn.execute("select value from config where name=?", ('user',))
+    user = c.fetchone()
+    conn.close()
+
+    if user is None:
+        message = "No user set up in database."
+        logging.error("%s" % message)
+        message += " Please go to Settings and enter a username."
+        info = hildon.hildon_note_new_information(win, message)
+        gtk.Dialog.run(info)
+
     try:
-        nf = NoticeFetcher(settings.user)
-        nf.fetch()
+        if user is not None:
+            user = user[0]
+            logging.info("Loading notices for %s" % user)
+            nf = NoticeFetcher(user)
+            nf.fetch()
     except Exception, e:
-        message = "Couldn't access network"
-        logging.critical("%s | %s" % (message, e))
+        message = "Problem loading notices. Is the network down?"
+        logging.error("%s | %s" % (message, e))
         hildon.hildon_banner_show_information(pannable_area, '', message)
 
     timeline = TimelineView()
     pannable_area.add_with_viewport(timeline.box)
 
-    win.set_app_menu(create_menu(pannable_area, timeline))
+    win.set_app_menu(create_menu(win, pannable_area, timeline))
     win.add(pannable_area)
     # scroll_to_child doesn't work if show_all() called twiced without hiding
     win.hide_all()

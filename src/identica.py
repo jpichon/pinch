@@ -15,6 +15,46 @@ class NoSuchUserException(Exception):
     def __str__(self):
         return repr(self.value)
 
+class UserFetcher():
+
+    def __init__(self, username, base_url='http://identi.ca'):
+        self.logger = logging.getLogger('UserFetcher')
+        self.base_url = base_url
+        self.user = username
+        self.user_id = self.fetch_user_id()
+
+    def fetch_user_id(self):
+        url = '%s/api/statusnet/app/service/%s.xml' % (self.base_url, self.user)
+
+        try:
+            self.logger.debug('Fetching user feed %s' % url)
+            response = urllib.urlopen(url)
+            content = response.read()
+
+            if "No such user" in content:
+                raise NoSuchUserException("User %s doesn't exist" % self.user)
+
+            dom = minidom.parseString(content)
+            collections = dom.getElementsByTagName("collection")
+
+            user_id = None
+            for item in collections:
+                if item.attributes.has_key('href'):
+                    import re
+                    m = re.search('(\d+)(?=\.atom$)',
+                                  item.attributes['href'].value)
+                    if m is not None:
+                        user_id = m.group(0)
+                        break
+
+            return user_id
+
+        except NoSuchUserException:
+            raise
+        except Exception, e:
+            self.logger.error("Could not fetch user information: %s (%s)",
+                              str(type(e)), e)
+            raise Exception("Could not fetch user information: %s", e)
 
 class NoticeFetcher():
 
@@ -22,45 +62,22 @@ class NoticeFetcher():
 
     def __init__(self, user, base_url='http://identi.ca'):
         self.logger = logging.getLogger('NoticeFetcher')
-        self.user = user
         self.base_url = base_url
 
         self.conn = sqlite3.connect(settings.db_path)
 
-        self.user_id = None
-        self._load_user_id()
-        self.since_id = None
-        self._load_since_id()
-
-    def get_user_id(self):
-        if self.user_id is None:
-            return self._load_user_id()
-        else:
-            return self.user_id
-
-    def _load_user_id(self):
         c = self.conn.execute("select value from config where name=?",
                               ('user',))
         value = c.fetchone()
+        self.user = value[0]
 
-        if value is None or value[0] != self.user:
-            self.user_id = self._fetch_user_id()
+        c = self.conn.execute("select value from config where name=?",
+                              ('user_id',))
+        value = c.fetchone()
+        self.user_id = value[0]
 
-            if value is None:
-                sql = "insert into config values (?, ?)"
-                self.conn.execute(sql, ('user', self.user))
-                self.conn.execute(sql, ('user_id', self.user_id))
-            else:
-                sql = "update config set value=? where name=?"
-                self.conn.execute(sql, (self.user, 'user'))
-                self.conn.execute(sql, (self.user_id, 'user_id'))
-
-            self.conn.execute("delete from notices")
-            self.conn.commit()
-        else:
-            c = self.conn.execute("select value from config where name=?",
-                                  ('user_id',))
-            self.user_id = c.fetchone()[0]
+        self.since_id = None
+        self._load_since_id()
 
     def get_since_id(self):
         if self.since_id is not None:
@@ -91,37 +108,6 @@ class NoticeFetcher():
             self.conn.commit()
             self.since_id = result[0]
 
-    def _fetch_user_id(self):
-        url = '%s/api/statusnet/app/service/%s.xml' % (self.base_url, self.user)
-
-        try:
-            self.logger.debug('Fetching user feed %s' % url)
-            response = urllib.urlopen(url)
-            content = response.read()
-
-            if "No such user" in content:
-                raise NoSuchUserException("User %s doesn't exist" % self.user)
-
-            dom = minidom.parseString(content)
-            collections = dom.getElementsByTagName("collection")
-
-            user_id = None
-            for item in collections:
-                if item.attributes.has_key('href'):
-                    import re
-                    m = re.search('(\d+)(?=\.atom$)',
-                                  item.attributes['href'].value)
-                    if m is not None:
-                        user_id = m.group(0)
-                        break
-
-            return user_id
-
-        except Exception, e:
-            self.logger.error("Could not fetch user information: %s (%s)",
-                              str(type(e)), e)
-            raise Exception("Could not fetch user information: %s", e)
-
     def fetch(self):
         if self.since_id is None or self.since_id == 0:
             self.fetch_latest()
@@ -131,11 +117,8 @@ class NoticeFetcher():
         self.update_since_id()
 
     def fetch_latest(self):
-        user_id = self.get_user_id()
-        url = '%s/api/statuses/home_timeline/%s.atom' % (self.base_url, user_id)
-
-        if user_id is None:
-            return
+        url = '%s/api/statuses/home_timeline/%s.atom' % (self.base_url,
+                                                         self.user_id)
 
         try:
             self.logger.debug('Fetching notices feed %s' % url)
@@ -151,12 +134,8 @@ class NoticeFetcher():
                               url, str(type(e)), e)
 
     def fetch_since(self, since_id):
-        user_id = self.get_user_id()
         max_id = 0
         url = '%s/api/statuses/home_timeline/%s.atom?max_id=%s&since_id=%s'
-
-        if user_id is None:
-            return
 
         if since_id is None:
             return self.fetch_latest()
@@ -167,7 +146,10 @@ class NoticeFetcher():
 
         while new_notices_count > 1 and retrieved < self.MAX_NOTICES:
             try:
-                current_url = url % (self.base_url, user_id, max_id, since_id)
+                current_url = url % (self.base_url,
+                                     self.user_id,
+                                     max_id,
+                                     since_id)
                 self.logger.debug('Fetching notices feed %s' % current_url)
                 response = urllib.urlopen(current_url)
 
