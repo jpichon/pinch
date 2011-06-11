@@ -307,7 +307,6 @@ def save_settings(widget, window, parent, entry):
         window.destroy()
         return
 
-    # Get user id
     try:
         uf = UserFetcher(user)
         user_id = uf.user_id
@@ -324,11 +323,12 @@ def save_settings(widget, window, parent, entry):
         conn.close()
 
         hildon.hildon_banner_show_information(parent, '', "Settings saved.")
-
         window.destroy()
+
     except NoSuchUserException, nse:
         message = "User does not exist."
         hildon.hildon_banner_show_information(parent, '', message)
+
     except Exception, e:
         logging.error("Error getting user info | %s %s" % (str(type(e)), e))
         message = "Couldn't get user information."
@@ -419,7 +419,9 @@ def main():
         logging.error("%s" % message)
         message += " Please go to Settings and enter a username."
         info = hildon.hildon_note_new_information(win, message)
-        gtk.Dialog.run(info)
+        response = gtk.Dialog.run(info)
+        if response == gtk.RESPONSE_DELETE_EVENT:
+            info.destroy()
 
     try:
         if user is not None:
