@@ -9,4 +9,5 @@ db_path =  data_path + '/' + db_name
 cache_path = os.path.expanduser('~/.cache/' + app_name.lower())
 
 log_file = data_path + '/log.txt'
-log_level = 'DEBUG'
+log_level = 'INFO'
+log_format = '%(asctime)s - %(levelname)s:%(name)s:%(message)s'

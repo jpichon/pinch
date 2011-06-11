@@ -394,7 +394,7 @@ def main():
 
     logging.basicConfig(filename=os.path.expanduser(settings.log_file),
                         filemode='w',
-                        format='%(asctime)s - %(levelname)s:%(name)s:%(message)s',
+                        format=settings.log_format,
                         level=logging.getLevelName(settings.log_level))
 
     gtk.set_application_name(settings.app_name)
