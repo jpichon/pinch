@@ -283,30 +283,6 @@ class Setup():
             conn.commit()
             conn.close()
 
-            if settings.debug:
-                self.create_fake_notices()
-
-    def create_fake_notices(self):
-        self.logger.debug("Creating fake notices")
-        notices = []
-
-        notices.append(Notice(1, "bob", "I like cheese!", "2011-04-25T14:00:14+00:00"))
-        notices.append(Notice(2, "alice", "Cool atmo at #RandomConference", "2011-04-25T13:54:00+00:00"))
-        notices.append(Notice(3, "someonewitharidiculouslylongnameabcdefghijklmnopqrstuvwxyz", "lol", "2011-04-25T13:40:40+00:00"))
-        notices.append(Notice(4, "Lort43", "An effort at writing a message that is one hundred and forty characters long, a message that is one hundred and forty characters long. Yes!", "2011-04-25T13:12:04+00:00", None, False, True))
-
-        conn = sqlite3.connect(settings.db_path)
-
-        for notice in notices:
-            conn.execute("insert into notices values (?, ?, ?, ?, ?, ?, ?)",
-                         (notice.id, notice.author, notice.message,
-                          notice.tstamp, '', 0, notice.read))
-
-        conn.commit()
-        conn.close()
-
-        return notices
-
 def remove_read_notices(widget, timeline):
     sql = "delete from notices where read = 1 and highlighted = 0"
     conn = sqlite3.connect(settings.db_path)
