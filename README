@@ -1,5 +1,10 @@
-Pinch is a micro-blogging reader (with bits of writing to come later
+Pinch is a micro-blogging reader (with bits of writer to come later
 on) for identi.ca written for the Maemo platform/N900.
+
+The goal and general direction is to build a micro-blogging tool
+optimised for reading: coping with large amounts of updates, being
+able to easily catch up in sections when time is short, highlight
+messages to deal with later (reply, URL to check out, ...), etc.
 
 To run in Scratchbox:
 * Make sure to have scratchbox installed [0] with the Python
@@ -13,7 +18,9 @@ To run on the N900:
   $ python2.5 src/base.py
 
 Debs to come later. Get in touch if you can't get it working, this is
-very much a work in progress.
+very much a work in progress. This also happens to be my first Gtk
+project, which means gremlins are surely lurking in the dark (feedback
+and tips welcome!)
 
 
 [0] http://wiki.maemo.org/Documentation/Maemo_5_Final_SDK_Installation
